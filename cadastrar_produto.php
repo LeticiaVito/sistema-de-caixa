@@ -8,6 +8,7 @@ if (!isset($_SESSION["usuario_id"])) {
 }
 
 require_once "config/conexao.php";
+require_once "config/foto_produto.php";
 
 $mensagem = "";
 $erro = "";
@@ -40,6 +41,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     } else {
 
+        $foto = null;
+
+        try {
+            $foto = salvarFotoProduto($_FILES["foto"] ?? []);
+
         $sql = "INSERT INTO produtos
         (
             nome,
@@ -49,14 +55,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             estoque,
             estoque_minimo,
             validade,
-            codigo
+            codigo,
+            foto
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         $stmt = $conn->prepare($sql);
 
+        if (!$stmt) {
+            excluirFotoProduto($foto);
+            throw new RuntimeException("Não foi possível preparar o cadastro.");
+        }
+
         $stmt->bind_param(
-            "ssddiiss",
+            "ssddiisss",
             $nome,
             $categoria,
             $precoCusto,
@@ -64,7 +76,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $estoque,
             $estoqueMinimo,
             $validade,
-            $codigo
+            $codigo,
+            $foto
         );
 
         if ($stmt->execute()) {
@@ -73,8 +86,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } else {
 
+            excluirFotoProduto($foto);
             $erro = "Erro ao cadastrar produto.";
 
+        }
+
+        } catch (RuntimeException $e) {
+            excluirFotoProduto($foto);
+            $erro = $e->getMessage();
         }
 
     }
@@ -172,6 +191,27 @@ select:focus{
     background:white;
 }
 
+.foto-area{
+    display:flex;
+    align-items:center;
+    gap:18px;
+    padding:16px;
+    border:1px dashed #ccc;
+    border-radius:12px;
+    background:#fafafa;
+}
+
+.foto-preview{
+    width:110px;
+    height:110px;
+    object-fit:cover;
+    border-radius:12px;
+    background:#eee;
+    display:none;
+}
+
+.foto-controles{flex:1}.foto-ajuda{display:block;margin-top:7px;color:#777;font-size:11px}
+
 .btn{
     width:100%;
     padding:14px;
@@ -249,9 +289,20 @@ Cadastre um novo item no estoque da cantina.
 <?php endif; ?>
 
 
-<form method="POST">
+<form method="POST" enctype="multipart/form-data">
 
 <div class="grid">
+
+<div class="campo full">
+<label for="foto">Foto do produto</label>
+<div class="foto-area">
+<img id="fotoPreview" class="foto-preview" alt="Pré-visualização da foto">
+<div class="foto-controles">
+<input id="foto" type="file" name="foto" accept="image/jpeg,image/png,image/webp">
+<span class="foto-ajuda">JPG, PNG ou WebP, com no máximo 2 MB.</span>
+</div>
+</div>
+</div>
 
 <div class="campo full">
 
@@ -395,6 +446,22 @@ Cadastrar Produto
 </div>
 
 </div>
+
+<script>
+document.getElementById("foto").addEventListener("change", function () {
+    const preview = document.getElementById("fotoPreview");
+    const arquivo = this.files[0];
+
+    if (!arquivo) {
+        preview.removeAttribute("src");
+        preview.style.display = "none";
+        return;
+    }
+
+    preview.src = URL.createObjectURL(arquivo);
+    preview.style.display = "block";
+});
+</script>
 
 </body>
 

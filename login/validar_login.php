@@ -5,7 +5,7 @@ session_start();
 require_once __DIR__ . "/../config/conexao.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    header("Location: /TioFabinho/index.php");
+    header("Location: ../index.php");
     exit;
 }
 
@@ -13,7 +13,7 @@ $email = trim($_POST["email"] ?? "");
 $senha = $_POST["senha"] ?? "";
 
 if ($email === "" || $senha === "") {
-    header("Location: /TioFabinho/index.php?erro=login");
+    header("Location: ../index.php?erro=login");
     exit;
 }
 
@@ -34,19 +34,19 @@ $stmt->execute();
 $resultado = $stmt->get_result();
 
 if ($resultado->num_rows !== 1) {
-    header("Location: /TioFabinho/index.php?erro=login");
+    header("Location: ../index.php?erro=login");
     exit;
 }
 
 $usuario = $resultado->fetch_assoc();
 
 if ((int)$usuario["ativo"] !== 1) {
-    header("Location: /TioFabinho/index.php?erro=inativo");
+    header("Location: ../index.php?erro=inativo");
     exit;
 }
 
 if (!password_verify($senha, $usuario["senha"])) {
-    header("Location: /TioFabinho/index.php?erro=login");
+    header("Location: ../index.php?erro=login");
     exit;
 }
 
@@ -55,5 +55,5 @@ $_SESSION["usuario_nome"] = $usuario["nome"];
 $_SESSION["usuario_email"] = $usuario["email"];
 $_SESSION["usuario_tipo"] = $usuario["tipo"];
 
-header("Location: /TioFabinho/dashboard.php");
+header("Location: ../dashboard.php");
 exit;

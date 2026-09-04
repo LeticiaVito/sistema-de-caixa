@@ -101,6 +101,25 @@ $conn->begin_transaction();
 
 try {
 
+    /* A venda precisa pertencer a um caixa aberto. O bloqueio evita que o
+       caixa seja fechado enquanto a venda estiver sendo processada. */
+    $sqlCaixa = "
+        SELECT id
+        FROM caixas
+        WHERE status = 'aberto'
+        ORDER BY id DESC
+        LIMIT 1
+        FOR UPDATE
+    ";
+
+    $resultadoCaixa = $conn->query($sqlCaixa);
+
+    if (!$resultadoCaixa || $resultadoCaixa->num_rows !== 1) {
+        throw new Exception("Não existe caixa aberto.");
+    }
+
+    $caixaId = (int)$resultadoCaixa->fetch_assoc()["id"];
+
 
     $itensVenda = [];
 
@@ -299,6 +318,7 @@ try {
     $sqlVenda = "
         INSERT INTO vendas
         (
+            caixa_id,
             usuario_id,
             total,
             forma_pagamento,
@@ -307,7 +327,7 @@ try {
             status
         )
         VALUES
-        (?, ?, ?, ?, ?, 'finalizada')
+        (?, ?, ?, ?, ?, ?, 'finalizada')
     ";
 
 
@@ -327,7 +347,8 @@ try {
 
 
     $stmtVenda->bind_param(
-        "idsdd",
+        "iidsdd",
+        $caixaId,
         $usuarioId,
         $totalVenda,
         $formaPagamento,

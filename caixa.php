@@ -189,14 +189,14 @@ if ($caixaAberto) {
 
         WHERE status = 'finalizada'
 
-        AND data_venda >= ?
+        AND caixa_id = ?
     ";
 
     $stmtVendas = $conn->prepare($sqlVendas);
 
     $stmtVendas->bind_param(
-        "s",
-        $caixaAberto["aberto_em"]
+        "i",
+        $caixaId
     );
 
     $stmtVendas->execute();
@@ -675,7 +675,13 @@ Caixa fechado com sucesso.
 <?php endif; ?>
 
 
-<?php if (isset($_GET["erro"])): ?>
+<?php if (($_GET["erro"] ?? "") === "caixa_fechado"): ?>
+
+<div class="mensagem erro">
+Abra o caixa antes de iniciar uma venda.
+</div>
+
+<?php elseif (isset($_GET["erro"])): ?>
 
 <div class="mensagem erro">
 Não foi possível concluir a operação.
@@ -696,7 +702,7 @@ Informe o valor inicial disponível em dinheiro.
 </p>
 
 <form
-action="/TioFabinho/abrir_caixa.php"
+action="abrir_caixa.php"
 method="POST"
 >
 

@@ -83,6 +83,7 @@ body{
     padding:20px;
     box-shadow:0 5px 20px rgba(0,0,0,.06);
     overflow-x:auto;
+    max-width:100%;
 }
 
 table{
@@ -155,6 +156,16 @@ td{
     font-size:13px;
 }
 
+@media(max-width:600px){
+    .container{
+        padding:16px;
+    }
+
+    .tabela-container{
+        padding:12px;
+    }
+}
+
 </style>
 
 </head>
@@ -181,6 +192,22 @@ Acompanhe todas as vendas realizadas na cantina.
 
 <div class="mensagem">
 Venda cancelada e estoque devolvido com sucesso.
+</div>
+
+<?php endif; ?>
+
+<?php if (($_GET["erro"] ?? "") === "cancelamento"): ?>
+
+<div class="mensagem" style="background:#ffe5e5;color:#b42318;">
+Não foi possível cancelar a venda. Atualize a página e tente novamente.
+</div>
+
+<?php endif; ?>
+
+<?php if (($_GET["erro"] ?? "") === "permissao"): ?>
+
+<div class="mensagem" style="background:#fff3d6;color:#9a6700;">
+Somente administradores podem cancelar vendas.
 </div>
 
 <?php endif; ?>

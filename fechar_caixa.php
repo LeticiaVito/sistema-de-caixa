@@ -122,15 +122,15 @@ $sqlVendas = "
     FROM vendas
     WHERE status = 'finalizada'
     AND forma_pagamento = 'dinheiro'
-    AND data_venda >= ?
+    AND caixa_id = ?
 ";
 
 $stmtVendas =
     $conn->prepare($sqlVendas);
 
 $stmtVendas->bind_param(
-    "s",
-    $caixa["aberto_em"]
+    "i",
+    $id
 );
 
 $stmtVendas->execute();

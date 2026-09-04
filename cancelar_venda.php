@@ -9,12 +9,34 @@ if (!isset($_SESSION["usuario_id"])) {
 
 require_once "config/conexao.php";
 
-$id = isset($_GET["id"])
-    ? (int)$_GET["id"]
+if (($_SESSION["usuario_tipo"] ?? "") !== "admin") {
+    header("Location: vendas.php?erro=permissao");
+    exit;
+}
+
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    header("Location: vendas.php?erro=cancelamento");
+    exit;
+}
+
+$tokenRecebido = $_POST["csrf_token"] ?? "";
+$tokenSessao = $_SESSION["csrf_token"] ?? "";
+
+if (
+    $tokenSessao === "" ||
+    !is_string($tokenRecebido) ||
+    !hash_equals($tokenSessao, $tokenRecebido)
+) {
+    header("Location: vendas.php?erro=cancelamento");
+    exit;
+}
+
+$id = isset($_POST["id"])
+    ? (int)$_POST["id"]
     : 0;
 
 if ($id <= 0) {
-    header("Location: vendas.php");
+    header("Location: vendas.php?erro=cancelamento");
     exit;
 }
 
@@ -86,7 +108,9 @@ try {
             $item["produto_id"]
         );
 
-        $stmtEstoque->execute();
+        if (!$stmtEstoque->execute() || $stmtEstoque->affected_rows !== 1) {
+            throw new Exception("Não foi possível devolver o item ao estoque.");
+        }
 
     }
 
@@ -105,10 +129,14 @@ try {
         $id
     );
 
-    $stmtCancelar->execute();
+    if (!$stmtCancelar->execute() || $stmtCancelar->affected_rows !== 1) {
+        throw new Exception("Não foi possível cancelar a venda.");
+    }
 
 
     $conn->commit();
+
+    unset($_SESSION["csrf_token"]);
 
 
     header(
@@ -123,7 +151,7 @@ try {
     $conn->rollback();
 
     header(
-        "Location: vendas.php"
+        "Location: vendas.php?erro=cancelamento"
     );
 
     exit;

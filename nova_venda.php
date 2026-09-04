@@ -9,13 +9,24 @@ if (!isset($_SESSION["usuario_id"])) {
 
 require_once "config/conexao.php";
 
+/* Não permite iniciar uma venda sem um caixa aberto. */
+$resultadoCaixa = $conn->query(
+    "SELECT id FROM caixas WHERE status = 'aberto' ORDER BY id DESC LIMIT 1"
+);
+
+if (!$resultadoCaixa || $resultadoCaixa->num_rows !== 1) {
+    header("Location: caixa.php?erro=caixa_fechado");
+    exit;
+}
+
 $sql = "
     SELECT
         id,
         nome,
         categoria,
         preco_venda,
-        estoque
+        estoque,
+        foto
     FROM produtos
     WHERE ativo = 1
     AND estoque > 0
@@ -140,6 +151,27 @@ body{
     padding:15px;
     cursor:pointer;
     transition:.2s;
+}
+
+.produto-foto{
+    width:100%;
+    height:125px;
+    object-fit:cover;
+    border-radius:9px;
+    margin-bottom:12px;
+    background:#f0f0f0;
+}
+
+.produto-foto-vazia{
+    width:100%;
+    height:125px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:9px;
+    margin-bottom:12px;
+    background:#f3f3f3;
+    font-size:38px;
 }
 
 .produto:hover{
@@ -402,6 +434,16 @@ onclick='adicionarProduto(
     <?php echo (int)$produto["estoque"]; ?>
 )'
 >
+
+<?php if (!empty($produto["foto"])): ?>
+<img
+class="produto-foto"
+src="<?php echo htmlspecialchars($produto["foto"]); ?>"
+alt="Foto de <?php echo htmlspecialchars($produto["nome"]); ?>"
+>
+<?php else: ?>
+<div class="produto-foto-vazia">📦</div>
+<?php endif; ?>
 
 <h3>
 <?php echo htmlspecialchars($produto["nome"]); ?>

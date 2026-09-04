@@ -8,6 +8,7 @@ if (!isset($_SESSION["usuario_id"])) {
 }
 
 require_once "config/conexao.php";
+require_once "config/foto_produto.php";
 
 $id = isset($_GET["id"]) ? (int)$_GET["id"] : 0;
 
@@ -80,6 +81,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     } else {
 
+        $fotoAnterior = $produto["foto"] ?? null;
+        $fotoNova = null;
+
+        try {
+            $fotoNova = salvarFotoProduto($_FILES["foto"] ?? []);
+            $removerFoto = isset($_POST["remover_foto"]);
+            $fotoFinal = $fotoNova ?? ($removerFoto ? null : $fotoAnterior);
+
         $sqlUpdate = "UPDATE produtos
                       SET nome = ?,
                           categoria = ?,
@@ -89,6 +98,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                           estoque_minimo = ?,
                           validade = ?,
                           codigo = ?,
+                          foto = ?,
                           ativo = ?
                       WHERE id = ?";
 
@@ -96,12 +106,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         if (!$stmtUpdate) {
 
+            excluirFotoProduto($fotoNova);
             $erro = "Erro ao preparar atualização.";
 
         } else {
 
             $stmtUpdate->bind_param(
-                "ssddiissii",
+                "ssddiisssii",
                 $nome,
                 $categoria,
                 $precoCusto,
@@ -110,12 +121,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $estoqueMinimo,
                 $validade,
                 $codigo,
+                $fotoFinal,
                 $ativo,
                 $id
             );
 
 
             if ($stmtUpdate->execute()) {
+
+                if ($fotoAnterior !== $fotoFinal) {
+                    excluirFotoProduto($fotoAnterior);
+                }
 
                 $mensagem = "Produto atualizado com sucesso!";
 
@@ -127,9 +143,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $produto["estoque_minimo"] = $estoqueMinimo;
                 $produto["validade"] = $validade;
                 $produto["codigo"] = $codigo;
+                $produto["foto"] = $fotoFinal;
                 $produto["ativo"] = $ativo;
 
             } else {
+
+                excluirFotoProduto($fotoNova);
 
                 if ($stmtUpdate->errno == 1062) {
 
@@ -143,6 +162,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             }
 
+        }
+
+        } catch (RuntimeException $e) {
+            excluirFotoProduto($fotoNova);
+            $erro = $e->getMessage();
         }
 
     }
@@ -260,6 +284,12 @@ select:focus{
     box-shadow:0 0 0 3px rgba(0,0,0,.04);
 }
 
+.foto-area{display:flex;align-items:center;gap:18px;padding:16px;border:1px dashed #ccc;border-radius:12px;background:#fafafa}
+.foto-preview{width:120px;height:120px;object-fit:cover;border-radius:12px;background:#eee}
+.foto-controles{flex:1}.foto-ajuda{display:block;margin-top:7px;color:#777;font-size:11px}
+.remover-foto{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;font-weight:normal}
+.remover-foto input{width:auto}
+
 .btn{
     width:100%;
     padding:14px;
@@ -373,10 +403,29 @@ Altere as informações do produto selecionado.
 <?php endif; ?>
 
 
-<form method="POST">
+<form method="POST" enctype="multipart/form-data">
 
 
 <div class="grid">
+
+<div class="campo full">
+<label for="foto">Foto do produto</label>
+<div class="foto-area">
+<img
+id="fotoPreview"
+class="foto-preview"
+src="<?php echo htmlspecialchars($produto["foto"] ?: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Crect width='100%25' height='100%25' fill='%23eeeeee'/%3E%3Ctext x='50%25' y='52%25' text-anchor='middle' fill='%23888' font-size='12'%3ESem foto%3C/text%3E%3C/svg%3E"); ?>"
+alt="Foto do produto"
+>
+<div class="foto-controles">
+<input id="foto" type="file" name="foto" accept="image/jpeg,image/png,image/webp">
+<span class="foto-ajuda">JPG, PNG ou WebP, com no máximo 2 MB.</span>
+<?php if (!empty($produto["foto"])): ?>
+<label class="remover-foto"><input type="checkbox" name="remover_foto" value="1"> Remover foto atual</label>
+<?php endif; ?>
+</div>
+</div>
+</div>
 
 
 <div class="campo full">
@@ -607,6 +656,14 @@ Salvar Alterações
 </div>
 
 </div>
+
+<script>
+document.getElementById("foto").addEventListener("change", function () {
+    if (this.files[0]) {
+        document.getElementById("fotoPreview").src = URL.createObjectURL(this.files[0]);
+    }
+});
+</script>
 
 </body>
 

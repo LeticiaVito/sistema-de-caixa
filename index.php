@@ -332,7 +332,7 @@ $erro = $_GET['erro'] ?? '';
         <?php endif; ?>
 
 
-        <form action="/TioFabinho/login/validar_login.php" method="POST">
+        <form action="login/validar_login.php" method="POST">
 
             <div class="campo">
 

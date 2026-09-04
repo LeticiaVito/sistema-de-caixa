@@ -77,12 +77,13 @@ body{
     padding:20px;
     box-shadow:0 5px 20px rgba(0,0,0,0.06);
     overflow-x:auto;
+    max-width:100%;
 }
 
 table{
     width:100%;
     border-collapse:collapse;
-    min-width:900px;
+    min-width:980px;
 }
 
 th{
@@ -185,6 +186,42 @@ td{
     font-size:13px;
 }
 
+.foto-produto{
+    width:54px;
+    height:54px;
+    border-radius:11px;
+    object-fit:cover;
+    display:block;
+    background:#eee;
+}
+
+.foto-vazia{
+    width:54px;
+    height:54px;
+    border-radius:11px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#f0f0f0;
+    font-size:23px;
+}
+
+@media(max-width:600px){
+    .container{
+        padding:16px;
+    }
+
+    .topo{
+        flex-direction:column;
+        align-items:flex-start;
+        gap:15px;
+    }
+
+    .tabela-container{
+        padding:12px;
+    }
+}
+
 </style>
 
 </head>
@@ -227,6 +264,7 @@ Produto desativado com sucesso.
 <thead>
 
 <tr>
+<th>Foto</th>
 <th>Produto</th>
 <th>Categoria</th>
 <th>Preço</th>
@@ -273,6 +311,18 @@ if ($ativo === 0) {
 ?>
 
 <tr class="<?php echo $ativo === 0 ? 'linha-inativa' : ''; ?>">
+
+<td>
+<?php if (!empty($produto["foto"])): ?>
+<img
+class="foto-produto"
+src="<?php echo htmlspecialchars($produto["foto"]); ?>"
+alt="Foto de <?php echo htmlspecialchars($produto["nome"]); ?>"
+>
+<?php else: ?>
+<div class="foto-vazia" title="Produto sem foto">📦</div>
+<?php endif; ?>
+</td>
 
 <td>
 <strong>

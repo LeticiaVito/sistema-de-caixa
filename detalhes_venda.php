@@ -9,6 +9,10 @@ if (!isset($_SESSION["usuario_id"])) {
 
 require_once "config/conexao.php";
 
+if (empty($_SESSION["csrf_token"])) {
+    $_SESSION["csrf_token"] = bin2hex(random_bytes(32));
+}
+
 $id = isset($_GET["id"])
     ? (int)$_GET["id"]
     : 0;
@@ -211,6 +215,9 @@ td{
     text-decoration:none;
     border-radius:10px;
     font-weight:bold;
+    border:none;
+    cursor:pointer;
+    font-size:14px;
 }
 
 .btn-cancelar:hover{
@@ -255,7 +262,10 @@ Detalhes completos da venda.
 
 <div>
 
-<?php if ($venda["status"] === "finalizada"): ?>
+<?php if (
+    $venda["status"] === "finalizada" &&
+    ($_SESSION["usuario_tipo"] ?? "") === "admin"
+): ?>
 
 <span class="badge finalizada">
 Finalizada
@@ -427,13 +437,27 @@ echo number_format(
 
 <?php if ($venda["status"] === "finalizada"): ?>
 
-<a
-href="cancelar_venda.php?id=<?php echo $venda["id"]; ?>"
-class="btn-cancelar"
-onclick="return confirm('Tem certeza que deseja cancelar esta venda? O estoque será devolvido.');"
+<form
+method="POST"
+action="cancelar_venda.php"
+onsubmit="return confirm('Tem certeza que deseja cancelar esta venda? O estoque será devolvido.');"
 >
+<input type="hidden" name="id" value="<?php echo $venda["id"]; ?>">
+<input
+type="hidden"
+name="csrf_token"
+value="<?php echo htmlspecialchars($_SESSION["csrf_token"], ENT_QUOTES, "UTF-8"); ?>"
+>
+<button type="submit" class="btn-cancelar">
 Cancelar Venda
-</a>
+</button>
+</form>
+
+<?php elseif ($venda["status"] === "finalizada"): ?>
+
+<p style="margin-top:25px;color:#777;font-size:13px;text-align:center;">
+Somente administradores podem cancelar vendas.
+</p>
 
 <?php endif; ?>
 

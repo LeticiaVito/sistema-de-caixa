@@ -284,11 +284,13 @@ Dashboard | Cantina do Tio Fabinho
 body{
     background:#f5f5f5;
     color:#222;
+    overflow-x:hidden;
 }
 
 .app{
     display:flex;
     min-height:100vh;
+    width:100%;
 }
 
 
@@ -317,6 +319,12 @@ body{
     top:0;
 
     bottom:0;
+
+    overflow-y:auto;
+
+    overflow-x:hidden;
+
+    z-index:10;
 
 }
 
@@ -471,6 +479,8 @@ body{
 
     padding:30px;
 
+    min-width:0;
+
 }
 
 
@@ -525,7 +535,7 @@ body{
 
     display:grid;
 
-    grid-template-columns:repeat(4,1fr);
+    grid-template-columns:repeat(4,minmax(0,1fr));
 
     gap:18px;
 
@@ -542,6 +552,8 @@ body{
     border-radius:16px;
 
     box-shadow:0 5px 20px rgba(0,0,0,.06);
+
+    min-width:0;
 
 }
 
@@ -614,7 +626,7 @@ body{
 
     display:grid;
 
-    grid-template-columns:2fr 1fr;
+    grid-template-columns:minmax(0,2fr) minmax(0,1fr);
 
     gap:20px;
 
@@ -639,6 +651,8 @@ body{
     padding:22px;
 
     box-shadow:0 5px 20px rgba(0,0,0,.06);
+
+    min-width:0;
 
 }
 
@@ -815,9 +829,50 @@ canvas{
 
 @media(max-width:1100px){
 
+    .sidebar{
+
+        width:80px;
+
+        padding-left:14px;
+        padding-right:14px;
+
+    }
+
+    .logo h2,
+    .logo span,
+    .menu a span,
+    .usuario,
+    .logout{
+
+        display:none;
+
+    }
+
+    .logo-icon{
+        margin-left:auto;
+        margin-right:auto;
+    }
+
+    .menu a{
+
+        text-align:center;
+        font-size:20px;
+        padding-left:8px;
+        padding-right:8px;
+
+    }
+
+    .main{
+
+        margin-left:80px;
+        width:calc(100% - 80px);
+        padding:20px;
+
+    }
+
     .cards{
 
-        grid-template-columns:repeat(2,1fr);
+        grid-template-columns:repeat(2,minmax(0,1fr));
 
     }
 
@@ -834,35 +889,18 @@ canvas{
 
     .sidebar{
 
-        width:80px;
-
-    }
-
-    .logo h2,
-    .logo span,
-    .menu a span,
-    .usuario,
-    .logout{
-
-        display:none;
-
-    }
-
-    .menu a{
-
-        text-align:center;
-
-        font-size:20px;
+        width:68px;
+        padding:18px 10px;
 
     }
 
     .main{
 
-        margin-left:80px;
+        margin-left:68px;
 
-        width:calc(100% - 80px);
+        width:calc(100% - 68px);
 
-        padding:20px;
+        padding:16px;
 
     }
 
@@ -880,6 +918,23 @@ canvas{
 
         gap:15px;
 
+    }
+
+}
+
+@media(max-width:420px){
+
+    .cards{
+        gap:12px;
+    }
+
+    .card,
+    .painel{
+        padding:16px;
+    }
+
+    .card .valor{
+        font-size:22px;
     }
 
 }
@@ -1001,6 +1056,19 @@ Fornecedores
 </span>
 
 </a>
+
+<?php if ($tipoUsuario === "admin"): ?>
+
+<a href="usuarios.php">
+
+👥
+<span>
+Usuários
+</span>
+
+</a>
+
+<?php endif; ?>
 
 
 </nav>
