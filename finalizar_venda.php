@@ -8,6 +8,7 @@ if (!isset($_SESSION["usuario_id"])) {
 }
 
 require_once "config/conexao.php";
+require_once "config/dinheiro.php";
 
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
@@ -27,6 +28,8 @@ $itensJson =
 
 $formaPagamento =
     $_POST["forma_pagamento"] ?? "";
+
+$dinheiroJson = $_POST["dinheiro_detalhes"] ?? "";
 
 $valorRecebido =
     isset($_POST["valor_recebido"])
@@ -279,10 +282,17 @@ try {
 
     if ($formaPagamento === "dinheiro") {
 
+        $dadosDinheiro = json_decode($dinheiroJson, true);
+        if (!is_array($dadosDinheiro)) {
+            throw new Exception("Informe as notas e moedas recebidas.");
+        }
+        $recebidoDetalhado = lerQuantidadesDinheiro($dadosDinheiro);
+        $recebidoCentavos = totalDinheiro($recebidoDetalhado);
+        $totalCentavos = (int)round($totalVenda * 100);
+
 
         if (
-            $valorRecebido === null ||
-            $valorRecebido < $totalVenda
+            $recebidoCentavos < $totalCentavos
         ) {
 
             throw new Exception(
@@ -292,9 +302,21 @@ try {
         }
 
 
-        $troco =
-            $valorRecebido -
-            $totalVenda;
+        $valorRecebido = $recebidoCentavos / 100;
+        $trocoCentavos = $recebidoCentavos - $totalCentavos;
+        $disponivel = [];
+        $resultadoDenominacoes = $conn->query("SELECT valor_centavos, quantidade FROM caixa_denominacoes WHERE caixa_id = $caixaId FOR UPDATE");
+        while ($linha = $resultadoDenominacoes->fetch_assoc()) {
+            $disponivel[(int)$linha["valor_centavos"]] = (int)$linha["quantidade"];
+        }
+        foreach ($recebidoDetalhado as $valor => $quantidade) {
+            $disponivel[$valor] = ($disponivel[$valor] ?? 0) + $quantidade;
+        }
+        $trocoDetalhado = separarTroco($trocoCentavos, $disponivel);
+        if ($trocoDetalhado === null) {
+            throw new Exception("O caixa não possui notas ou moedas suficientes para esse troco.");
+        }
+        $troco = $trocoCentavos / 100;
 
 
     } else {
@@ -368,6 +390,21 @@ try {
 
     $vendaId =
         $conn->insert_id;
+
+    if ($formaPagamento === "dinheiro") {
+        $stmtDetalhe = $conn->prepare("INSERT INTO venda_dinheiro_detalhes (venda_id, tipo, valor_centavos, quantidade) VALUES (?, ?, ?, ?)");
+        $stmtSaldo = $conn->prepare("INSERT INTO caixa_denominacoes (caixa_id, valor_centavos, quantidade) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quantidade = quantidade + VALUES(quantidade)");
+        foreach (["recebido" => $recebidoDetalhado, "troco" => $trocoDetalhado] as $tipo => $quantidades) {
+            foreach ($quantidades as $valor => $quantidade) {
+                if ($quantidade <= 0) continue;
+                $stmtDetalhe->bind_param("isii", $vendaId, $tipo, $valor, $quantidade);
+                if (!$stmtDetalhe->execute()) throw new Exception("Erro ao registrar dinheiro da venda.");
+                $ajuste = $tipo === "recebido" ? $quantidade : -$quantidade;
+                $stmtSaldo->bind_param("iii", $caixaId, $valor, $ajuste);
+                if (!$stmtSaldo->execute()) throw new Exception("Erro ao atualizar dinheiro do caixa.");
+            }
+        }
+    }
 
 
 /* ==============================

@@ -45,7 +45,7 @@ $conn->begin_transaction();
 try {
 
     $sqlVenda = "
-        SELECT status
+        SELECT status, caixa_id, forma_pagamento
         FROM vendas
         WHERE id = ?
         FOR UPDATE
@@ -131,6 +131,21 @@ try {
 
     if (!$stmtCancelar->execute() || $stmtCancelar->affected_rows !== 1) {
         throw new Exception("Não foi possível cancelar a venda.");
+    }
+
+    if ($venda["forma_pagamento"] === "dinheiro") {
+        $stmtDinheiro = $conn->prepare("SELECT tipo, valor_centavos, quantidade FROM venda_dinheiro_detalhes WHERE venda_id = ?");
+        $stmtDinheiro->bind_param("i", $id);
+        $stmtDinheiro->execute();
+        $resultadoDinheiro = $stmtDinheiro->get_result();
+        $stmtSaldo = $conn->prepare("UPDATE caixa_denominacoes SET quantidade = quantidade + ? WHERE caixa_id = ? AND valor_centavos = ?");
+        while ($detalhe = $resultadoDinheiro->fetch_assoc()) {
+            $ajuste = $detalhe["tipo"] === "recebido" ? -(int)$detalhe["quantidade"] : (int)$detalhe["quantidade"];
+            $caixaVendaId = (int)$venda["caixa_id"];
+            $valorCentavos = (int)$detalhe["valor_centavos"];
+            $stmtSaldo->bind_param("iii", $ajuste, $caixaVendaId, $valorCentavos);
+            if (!$stmtSaldo->execute()) throw new Exception("Não foi possível ajustar o dinheiro do caixa.");
+        }
     }
 
 

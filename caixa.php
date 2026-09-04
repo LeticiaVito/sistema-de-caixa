@@ -8,6 +8,7 @@ if (!isset($_SESSION["usuario_id"])) {
 }
 
 require_once "config/conexao.php";
+require_once "config/dinheiro.php";
 
 $usuarioId = (int)$_SESSION["usuario_id"];
 
@@ -345,6 +346,12 @@ body{
     margin-bottom:25px;
 }
 
+.denominacoes-abertura{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0}
+.denominacao-campo{background:#f7f7f7;border:1px solid #eee;border-radius:10px;padding:10px}
+.denominacao-campo span{display:block;font-size:11px;font-weight:bold;margin-bottom:6px}
+.denominacao-campo input{margin:0;padding:10px;background:#fff}
+.total-abertura{background:#181818;color:#fff;padding:14px;border-radius:10px;margin-bottom:10px;display:flex;justify-content:space-between}
+
 .campo{
     max-width:400px;
     margin:0 auto 15px;
@@ -600,6 +607,8 @@ th{
 
 @media(max-width:550px){
 
+    .denominacoes-abertura{grid-template-columns:repeat(2,1fr)}
+
     .cards-resumo,
     .pagamentos{
         grid-template-columns:1fr;
@@ -706,22 +715,16 @@ action="abrir_caixa.php"
 method="POST"
 >
 
-<div class="campo">
-
-<label>
-Valor inicial em espécie
+<div class="denominacoes-abertura">
+<?php foreach (denominacoesDinheiro() as $valorCentavos => $rotulo): ?>
+<label class="denominacao-campo">
+<span><?php echo htmlspecialchars($rotulo); ?></span>
+<input type="number" name="denominacoes[<?php echo $valorCentavos; ?>]" min="0" value="0" inputmode="numeric" oninput="calcularAbertura()">
 </label>
-
-<input
-type="number"
-name="valor_inicial"
-step="0.01"
-min="0"
-value="0.00"
-required
->
-
+<?php endforeach; ?>
 </div>
+
+<div class="total-abertura">Total inicial: <strong id="totalAbertura">R$ 0,00</strong></div>
 
 <button class="btn" type="submit">
 Abrir Caixa
@@ -1285,4 +1288,15 @@ Nenhuma movimentação registrada neste caixa.
 </div>
 
 </body>
+
+<script>
+function calcularAbertura(){
+    let centavos=0;
+    document.querySelectorAll('.denominacoes-abertura input').forEach(input=>{
+        const valor=parseInt(input.name.match(/\[(\d+)\]/)[1],10);
+        centavos+=valor*(parseInt(input.value,10)||0);
+    });
+    document.getElementById('totalAbertura').textContent=(centavos/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}
+</script>
 </html>

@@ -8,6 +8,7 @@ if (!isset($_SESSION["usuario_id"])) {
 }
 
 require_once "config/conexao.php";
+require_once "config/dinheiro.php";
 
 $id =
     isset($_GET["id"])
@@ -148,11 +149,26 @@ $valorEsperado =
     - (float)$mov["saidas"]
     - (float)$mov["sangrias"];
 
+$denominacoesEsperadas = array_fill_keys(array_keys(denominacoesDinheiro()), 0);
+$stmtDenominacoes = $conn->prepare("SELECT valor_centavos, quantidade FROM caixa_denominacoes WHERE caixa_id = ?");
+$stmtDenominacoes->bind_param("i", $id);
+$stmtDenominacoes->execute();
+$resultadoDenominacoes = $stmtDenominacoes->get_result();
+while ($linha = $resultadoDenominacoes->fetch_assoc()) {
+    $denominacoesEsperadas[(int)$linha["valor_centavos"]] = (int)$linha["quantidade"];
+}
+
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $valorFinal =
-        (float)($_POST["valor_final"] ?? 0);
+    $contagemFinal = lerQuantidadesDinheiro($_POST["contagem"] ?? []);
+    $valorFinal = totalDinheiro($contagemFinal) / 100;
+
+    $stmtContagem = $conn->prepare("INSERT INTO caixa_contagem_fechamento (caixa_id, valor_centavos, quantidade) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quantidade = VALUES(quantidade)");
+    foreach ($contagemFinal as $valorCentavos => $quantidade) {
+        $stmtContagem->bind_param("iii", $id, $valorCentavos, $quantidade);
+        $stmtContagem->execute();
+    }
 
 
     $sqlFechar = "
@@ -289,6 +305,11 @@ button:hover{
     background:#8f1c14;
 }
 
+.contagem{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}
+.contagem label{background:#f7f7f7;padding:10px;border-radius:10px;margin:0}.contagem small{display:block;color:#777;margin:4px 0 7px}
+.contagem input{margin:0;padding:10px;background:#fff}.total-contado{padding:14px;background:#181818;color:#fff;border-radius:10px;margin-bottom:16px;display:flex;justify-content:space-between}
+@media(max-width:550px){.contagem{grid-template-columns:repeat(2,1fr)}}
+
 </style>
 
 </head>
@@ -333,17 +354,12 @@ echo number_format(
 
 <form method="POST">
 
-<label>
-Valor contado no caixa
-</label>
-
-<input
-type="number"
-name="valor_final"
-step="0.01"
-min="0"
-required
->
+<div class="contagem">
+<?php foreach (denominacoesDinheiro() as $valorCentavos => $rotulo): ?>
+<label><?php echo htmlspecialchars($rotulo); ?><small>Esperado: <?php echo $denominacoesEsperadas[$valorCentavos]; ?></small><input type="number" name="contagem[<?php echo $valorCentavos; ?>]" min="0" value="<?php echo $denominacoesEsperadas[$valorCentavos]; ?>" oninput="calcularContado()" required></label>
+<?php endforeach; ?>
+</div>
+<div class="total-contado"><span>Total contado</span><strong id="totalContado">R$ <?php echo number_format($valorEsperado,2,',','.'); ?></strong></div>
 
 <button type="submit">
 Confirmar Fechamento
@@ -355,6 +371,10 @@ Confirmar Fechamento
 
 </div>
 
+<script>
+function calcularContado(){let c=0;document.querySelectorAll('.contagem input').forEach(i=>{c+=parseInt(i.name.match(/\[(\d+)\]/)[1],10)*(parseInt(i.value,10)||0)});document.getElementById('totalContado').textContent=(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+calcularContado();
+</script>
 </body>
 
 </html>

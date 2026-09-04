@@ -8,6 +8,7 @@ if (!isset($_SESSION["usuario_id"])) {
 }
 
 require_once "config/conexao.php";
+require_once "config/dinheiro.php";
 
 /* Não permite iniciar uma venda sem um caixa aberto. */
 $resultadoCaixa = $conn->query(
@@ -299,6 +300,14 @@ body{
     background:white;
 }
 
+.dinheiro-box{margin-top:18px;background:#f7f7f7;padding:16px;border-radius:12px}
+.dinheiro-box h3{font-size:14px;margin-bottom:4px}.dinheiro-ajuda{font-size:11px;color:#777;margin-bottom:12px}
+.denominacoes-venda{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.denominacao-btn{border:1px solid #ddd;background:#fff;border-radius:9px;padding:10px 5px;cursor:pointer;font-weight:bold}
+.denominacao-btn:hover{border-color:#222}.dinheiro-resumo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.dinheiro-valor{background:#fff;padding:12px;border-radius:9px}.dinheiro-valor span{display:block;font-size:10px;color:#777}.dinheiro-valor strong{font-size:18px}
+.dinheiro-acoes{display:flex;gap:8px;margin-top:10px}.dinheiro-acoes button{flex:1;border:0;border-radius:8px;padding:9px;cursor:pointer}.pagamento-exato{background:#181818;color:#fff}
+
 .btn-finalizar{
     width:100%;
     border:none;
@@ -350,6 +359,8 @@ body{
     .produtos{
         grid-template-columns:1fr;
     }
+
+    .denominacoes-venda{grid-template-columns:repeat(3,1fr)}
 
 }
 
@@ -557,56 +568,24 @@ R$ 0,00
 
 <div
     id="areaDinheiro"
-    style="display:none; margin-top:18px;"
+    class="dinheiro-box"
+    style="display:none;"
 >
 
-    <div class="pagamento">
-
-        <label>
-            Valor recebido
-        </label>
-
-        <input
-            type="number"
-            id="valorRecebido"
-            name="valor_recebido"
-            step="0.01"
-            min="0"
-            placeholder="Ex: 20.00"
-            oninput="calcularTroco()"
-        >
-
+    <h3>Dinheiro recebido</h3>
+    <p class="dinheiro-ajuda">Toque em cada nota ou moeda entregue pelo cliente.</p>
+    <input type="hidden" id="valorRecebido" name="valor_recebido">
+    <input type="hidden" id="dinheiroDetalhes" name="dinheiro_detalhes">
+    <div class="denominacoes-venda">
+    <?php foreach (denominacoesDinheiro() as $valorCentavos => $rotulo): ?>
+    <button type="button" class="denominacao-btn" onclick="adicionarDinheiro(<?php echo $valorCentavos; ?>)"><?php echo htmlspecialchars($rotulo); ?><small id="qtd-<?php echo $valorCentavos; ?>"></small></button>
+    <?php endforeach; ?>
     </div>
-
-
-    <div
-        style="
-            margin-top:15px;
-            background:#f7f7f7;
-            padding:15px;
-            border-radius:10px;
-        "
-    >
-
-        <span
-            style="
-                display:block;
-                font-size:12px;
-                color:#777;
-                margin-bottom:5px;
-            "
-        >
-            Troco
-        </span>
-
-        <strong
-            id="trocoVenda"
-            style="font-size:22px;"
-        >
-            R$ 0,00
-        </strong>
-
+    <div class="dinheiro-resumo">
+      <div class="dinheiro-valor"><span>Recebido</span><strong id="recebidoVenda">R$ 0,00</strong></div>
+      <div class="dinheiro-valor"><span>Troco</span><strong id="trocoVenda">R$ 0,00</strong></div>
     </div>
+    <div class="dinheiro-acoes"><button type="button" onclick="limparDinheiro()">Limpar</button><button type="button" class="pagamento-exato" onclick="pagamentoExato()">Pagamento exato</button></div>
 
 </div>
 
@@ -632,6 +611,26 @@ Finalizar Venda
 <script>
 
 let carrinho = [];
+let dinheiroRecebido = {};
+const valoresDinheiro = [20000,10000,5000,2000,1000,500,200,100,50,25,10,5,1];
+
+function totalCarrinhoCentavos(){return Math.round(carrinho.reduce((t,i)=>t+i.preco*i.quantidade,0)*100)}
+function moeda(c){return (c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function alterarFormaPagamento(){document.getElementById('areaDinheiro').style.display=document.getElementById('formaPagamento').value==='dinheiro'?'block':'none'}
+function adicionarDinheiro(valor){dinheiroRecebido[valor]=(dinheiroRecebido[valor]||0)+1; atualizarDinheiro()}
+function limparDinheiro(){dinheiroRecebido={};atualizarDinheiro()}
+function pagamentoExato(){
+    dinheiroRecebido={};let restante=totalCarrinhoCentavos();
+    valoresDinheiro.forEach(v=>{const q=Math.floor(restante/v);if(q){dinheiroRecebido[v]=q;restante-=q*v}});
+    atualizarDinheiro();
+}
+function atualizarDinheiro(){
+    let recebido=0; valoresDinheiro.forEach(v=>{const q=dinheiroRecebido[v]||0;recebido+=v*q;const el=document.getElementById('qtd-'+v);el.textContent=q?' ×'+q:''});
+    document.getElementById('recebidoVenda').textContent=moeda(recebido);
+    document.getElementById('trocoVenda').textContent=moeda(Math.max(0,recebido-totalCarrinhoCentavos()));
+    document.getElementById('valorRecebido').value=(recebido/100).toFixed(2);
+    document.getElementById('dinheiroDetalhes').value=JSON.stringify(dinheiroRecebido);
+}
 
 
 function adicionarProduto(id, nome, preco, estoque){
@@ -756,6 +755,8 @@ function atualizarCarrinho(){
 
         btnFinalizar.disabled = true;
 
+        atualizarDinheiro();
+
         return;
 
     }
@@ -848,6 +849,8 @@ function atualizarCarrinho(){
 
 
     btnFinalizar.disabled = false;
+
+    atualizarDinheiro();
 
 }
 

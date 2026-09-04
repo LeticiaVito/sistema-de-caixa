@@ -8,13 +8,16 @@ if (!isset($_SESSION["usuario_id"])) {
 }
 
 require_once "config/conexao.php";
+require_once "config/dinheiro.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     header("Location: caixa.php");
     exit;
 }
 
-$valorInicial = (float)($_POST["valor_inicial"] ?? 0);
+$quantidades = lerQuantidadesDinheiro($_POST["denominacoes"] ?? []);
+$valorInicialCentavos = totalDinheiro($quantidades);
+$valorInicial = $valorInicialCentavos / 100;
 $usuarioId = (int)$_SESSION["usuario_id"];
 
 
@@ -59,6 +62,16 @@ $stmt->bind_param(
 );
 
 if ($stmt->execute()) {
+
+    $caixaId = $conn->insert_id;
+    $stmtDenominacao = $conn->prepare(
+        "INSERT INTO caixa_denominacoes (caixa_id, valor_centavos, quantidade) VALUES (?, ?, ?)"
+    );
+
+    foreach ($quantidades as $valorCentavos => $quantidade) {
+        $stmtDenominacao->bind_param("iii", $caixaId, $valorCentavos, $quantidade);
+        $stmtDenominacao->execute();
+    }
 
     header("Location: caixa.php?aberto=1");
     exit;
