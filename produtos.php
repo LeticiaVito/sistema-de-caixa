@@ -9,8 +9,16 @@ if (!isset($_SESSION["usuario_id"])) {
 
 require_once "config/conexao.php";
 
-$sql = "SELECT * FROM produtos ORDER BY ativo DESC, id DESC";
-$resultado = $conn->query($sql);
+if (empty($_SESSION["csrf_token_produtos"])) {
+    $_SESSION["csrf_token_produtos"] = bin2hex(random_bytes(32));
+}
+
+$mostrarArquivados = isset($_GET["arquivados"]);
+$statusListado = $mostrarArquivados ? 0 : 1;
+$stmtProdutos = $conn->prepare("SELECT * FROM produtos WHERE ativo = ? ORDER BY id DESC");
+$stmtProdutos->bind_param("i", $statusListado);
+$stmtProdutos->execute();
+$resultado = $stmtProdutos->get_result();
 
 ?>
 
@@ -173,6 +181,14 @@ td{
     background:#ffd5d5;
 }
 
+.acoes form{margin:0}
+.acoes-topo{display:flex;gap:10px;align-items:center}
+.btn-secundario{background:white;color:#222;border:1px solid #ddd}
+.btn-restaurar{border:none;background:#e8f7ec;color:#247a3d;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer}
+.btn-excluir{border:none;background:#b42318;color:white;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer}
+.btn-excluir:hover{background:#8f1c14}
+.mensagem.erro{background:#ffe5e5;color:#b42318}
+
 .linha-inativa{
     opacity:0.6;
 }
@@ -241,18 +257,33 @@ td{
 <p>Gerencie os produtos da Cantina do Tio Fabinho.</p>
 </div>
 
-<a class="btn" href="cadastrar_produto.php">
-+ Novo Produto
-</a>
+<div class="acoes-topo">
+<a class="btn btn-secundario" href="produtos.php<?php echo $mostrarArquivados ? '' : '?arquivados=1'; ?>"><?php echo $mostrarArquivados ? 'Ver produtos ativos' : 'Mostrar arquivados'; ?></a>
+<a class="btn" href="cadastrar_produto.php">+ Novo Produto</a>
+</div>
 
 </div>
 
-<?php if (isset($_GET["desativado"])): ?>
+<?php if (isset($_GET["arquivado"])): ?>
 
 <div class="mensagem">
-Produto desativado com sucesso.
+Produto arquivado com sucesso.
 </div>
 
+<?php endif; ?>
+
+<?php if (isset($_GET["restaurado"])): ?>
+<div class="mensagem">Produto restaurado com sucesso.</div>
+<?php endif; ?>
+
+<?php if (isset($_GET["excluido"])): ?>
+<div class="mensagem">Produto excluído permanentemente.</div>
+<?php endif; ?>
+
+<?php if (($_GET["erro"] ?? "") === "historico"): ?>
+<div class="mensagem erro">Esse produto possui vendas registradas e não pode ser excluído. Arquive-o para preservar o histórico.</div>
+<?php elseif (isset($_GET["erro"])): ?>
+<div class="mensagem erro">Não foi possível excluir o produto.</div>
 <?php endif; ?>
 
 <div class="tabela-container">
@@ -387,16 +418,19 @@ class="btn-editar"
 Editar
 </a>
 
-<?php if ($ativo === 1): ?>
+<form method="POST" action="desativar_produto.php" onsubmit="return confirm('<?php echo $ativo ? 'Arquivar este produto?' : 'Restaurar este produto?'; ?>');">
+<input type="hidden" name="id" value="<?php echo (int)$produto["id"]; ?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION["csrf_token_produtos"], ENT_QUOTES, "UTF-8"); ?>">
+<input type="hidden" name="acao" value="<?php echo $ativo ? 'arquivar' : 'restaurar'; ?>">
+<button type="submit" class="<?php echo $ativo ? 'btn-desativar' : 'btn-restaurar'; ?>"><?php echo $ativo ? 'Arquivar' : 'Restaurar'; ?></button>
+</form>
 
-<a
-href="desativar_produto.php?id=<?php echo $produto['id']; ?>"
-class="btn-desativar"
-onclick="return confirm('Deseja realmente desativar este produto?');"
->
-Desativar
-</a>
-
+<?php if (($_SESSION["usuario_tipo"] ?? "") === "admin"): ?>
+<form method="POST" action="excluir_produto.php" onsubmit="return confirm('Excluir este produto permanentemente? Essa ação não poderá ser desfeita.');">
+<input type="hidden" name="id" value="<?php echo (int)$produto["id"]; ?>">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION["csrf_token_produtos"], ENT_QUOTES, "UTF-8"); ?>">
+<button type="submit" class="btn-excluir">Excluir</button>
+</form>
 <?php endif; ?>
 
 </div>
@@ -415,10 +449,10 @@ Desativar
 
 <div class="vazio">
 
-<h3>Nenhum produto cadastrado</h3>
+<h3><?php echo $mostrarArquivados ? 'Nenhum produto arquivado' : 'Nenhum produto ativo'; ?></h3>
 
 <p>
-Clique em “Novo Produto” para começar.
+<?php echo $mostrarArquivados ? 'Os produtos arquivados aparecerão aqui.' : 'Clique em “Novo Produto” para começar.'; ?>
 </p>
 
 </div>

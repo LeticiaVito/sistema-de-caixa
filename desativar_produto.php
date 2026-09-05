@@ -9,22 +9,41 @@ if (!isset($_SESSION["usuario_id"])) {
 
 require_once "config/conexao.php";
 
-$id = isset($_GET["id"]) ? (int)$_GET["id"] : 0;
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    header("Location: produtos.php?erro=status");
+    exit;
+}
 
-if ($id <= 0) {
+$tokenRecebido = $_POST["csrf_token"] ?? "";
+$tokenSessao = $_SESSION["csrf_token_produtos"] ?? "";
+
+if (!is_string($tokenRecebido) || $tokenSessao === "" || !hash_equals($tokenSessao, $tokenRecebido)) {
+    header("Location: produtos.php?erro=status");
+    exit;
+}
+
+$id = isset($_POST["id"]) ? (int)$_POST["id"] : 0;
+$acao = $_POST["acao"] ?? "";
+
+if ($id <= 0 || !in_array($acao, ["arquivar", "restaurar"], true)) {
     header("Location: produtos.php");
     exit;
 }
 
+$novoStatus = $acao === "restaurar" ? 1 : 0;
 $sql = "UPDATE produtos
-        SET ativo = 0
+        SET ativo = ?
         WHERE id = ?";
 
 $stmt = $conn->prepare($sql);
 
-$stmt->bind_param("i", $id);
+$stmt->bind_param("ii", $novoStatus, $id);
 
 $stmt->execute();
 
-header("Location: produtos.php?desativado=1");
+$destino = $acao === "restaurar"
+    ? "produtos.php?arquivados=1&restaurado=1"
+    : "produtos.php?arquivado=1";
+
+header("Location: " . $destino);
 exit;

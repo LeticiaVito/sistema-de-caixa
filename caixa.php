@@ -499,6 +499,13 @@ input{
     margin-bottom:10px;
 }
 
+.btn-selecionar{width:100%;border:1px solid #ddd;background:#f7f7f7;padding:10px;border-radius:8px;font-size:11px;font-weight:bold;cursor:pointer;margin-bottom:8px}
+.modal-dinheiro{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:100}
+.modal-dinheiro.aberto{display:flex}.modal-conteudo{background:#fff;border-radius:16px;padding:22px;width:min(620px,100%);max-height:90vh;overflow:auto}
+.modal-topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.modal-fechar{border:0;background:#eee;border-radius:8px;padding:8px 11px;cursor:pointer}
+.modal-denominacoes{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.modal-nota{border:1px solid #ddd;background:#fff;border-radius:9px;padding:10px 5px;cursor:pointer;font-weight:bold}.modal-nota small{display:block;color:#247a3d;margin-top:3px}
+.modal-total{background:#181818;color:#fff;padding:14px;border-radius:10px;margin:15px 0;display:flex;justify-content:space-between}.modal-acoes{display:flex;gap:9px}.modal-acoes button{flex:1;padding:11px;border:0;border-radius:9px;cursor:pointer}.modal-confirmar{background:#181818;color:#fff}
+
 .tabela-container{
     overflow-x:auto;
 }
@@ -1029,8 +1036,12 @@ name="valor"
 step="0.01"
 min="0.01"
 placeholder="Valor"
+class="valor-movimentacao"
+readonly
 required
 >
+<input type="hidden" name="dinheiro_detalhes" class="dinheiro-detalhes">
+<button type="button" class="btn-selecionar" onclick="abrirSeletor(this.form)">Selecionar notas e moedas</button>
 
 <button class="btn" type="submit">
 Registrar
@@ -1069,8 +1080,12 @@ name="valor"
 step="0.01"
 min="0.01"
 placeholder="Valor"
+class="valor-movimentacao"
+readonly
 required
 >
+<input type="hidden" name="dinheiro_detalhes" class="dinheiro-detalhes">
+<button type="button" class="btn-selecionar" onclick="abrirSeletor(this.form)">Selecionar notas e moedas</button>
 
 <button class="btn" type="submit">
 Registrar
@@ -1109,8 +1124,12 @@ name="valor"
 step="0.01"
 min="0.01"
 placeholder="Valor"
+class="valor-movimentacao"
+readonly
 required
 >
+<input type="hidden" name="dinheiro_detalhes" class="dinheiro-detalhes">
+<button type="button" class="btn-selecionar" onclick="abrirSeletor(this.form)">Selecionar notas e moedas</button>
 
 <button class="btn" type="submit">
 Registrar
@@ -1287,6 +1306,19 @@ Nenhuma movimentação registrada neste caixa.
 
 </div>
 
+<div class="modal-dinheiro" id="modalDinheiro">
+<div class="modal-conteudo">
+<div class="modal-topo"><div><h2>Notas e moedas</h2><small>Toque nos valores para adicionar.</small></div><button type="button" class="modal-fechar" onclick="fecharSeletor()">✕</button></div>
+<div class="modal-denominacoes">
+<?php foreach (denominacoesDinheiro() as $valorCentavos => $rotulo): ?>
+<button type="button" class="modal-nota" onclick="adicionarMovimento(<?php echo $valorCentavos; ?>)"><?php echo htmlspecialchars($rotulo); ?><small id="mov-qtd-<?php echo $valorCentavos; ?>"></small></button>
+<?php endforeach; ?>
+</div>
+<div class="modal-total"><span>Total selecionado</span><strong id="modalTotal">R$ 0,00</strong></div>
+<div class="modal-acoes"><button type="button" onclick="limparMovimento()">Limpar</button><button type="button" class="modal-confirmar" onclick="confirmarMovimento()">Confirmar</button></div>
+</div>
+</div>
+
 </body>
 
 <script>
@@ -1298,5 +1330,13 @@ function calcularAbertura(){
     });
     document.getElementById('totalAbertura').textContent=(centavos/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 }
+
+let formularioMovimento=null;let movimentoAtual={};const valoresMovimento=[20000,10000,5000,2000,1000,500,200,100,50,25,10,5,1];
+function abrirSeletor(form){formularioMovimento=form;try{movimentoAtual=JSON.parse(form.querySelector('.dinheiro-detalhes').value)||{}}catch(e){movimentoAtual={}};atualizarSeletor();document.getElementById('modalDinheiro').classList.add('aberto')}
+function fecharSeletor(){document.getElementById('modalDinheiro').classList.remove('aberto')}
+function adicionarMovimento(v){movimentoAtual[v]=(movimentoAtual[v]||0)+1;atualizarSeletor()}
+function limparMovimento(){movimentoAtual={};atualizarSeletor()}
+function atualizarSeletor(){let total=0;valoresMovimento.forEach(v=>{const q=movimentoAtual[v]||0;total+=v*q;document.getElementById('mov-qtd-'+v).textContent=q?'× '+q:''});document.getElementById('modalTotal').textContent=(total/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function confirmarMovimento(){let total=0;valoresMovimento.forEach(v=>total+=v*(movimentoAtual[v]||0));formularioMovimento.querySelector('.valor-movimentacao').value=(total/100).toFixed(2);formularioMovimento.querySelector('.dinheiro-detalhes').value=JSON.stringify(movimentoAtual);fecharSeletor()}
 </script>
 </html>

@@ -8,6 +8,7 @@ if (!isset($_SESSION["usuario_id"])) {
 }
 
 require_once "config/conexao.php";
+require_once "config/dinheiro.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 
@@ -22,8 +23,18 @@ $tipo =
 $descricao =
     trim($_POST["descricao"] ?? "");
 
-$valor =
-    (float)($_POST["valor"] ?? 0);
+$dinheiroDados = json_decode($_POST["dinheiro_detalhes"] ?? "", true);
+
+try {
+    if (!is_array($dinheiroDados)) throw new RuntimeException("Informe as notas e moedas.");
+    $quantidadesDinheiro = lerQuantidadesDinheiro($dinheiroDados);
+    $valorCentavosTotal = totalDinheiro($quantidadesDinheiro);
+} catch (RuntimeException $e) {
+    header("Location: caixa.php?erro=dinheiro");
+    exit;
+}
+
+$valor = $valorCentavosTotal / 100;
 
 $usuarioId =
     (int)$_SESSION["usuario_id"];
@@ -59,12 +70,15 @@ if (
 
 /* caixa aberto */
 
+$conn->begin_transaction();
+
 $sqlCaixa = "
     SELECT id
     FROM caixas
     WHERE status = 'aberto'
     ORDER BY id DESC
     LIMIT 1
+    FOR UPDATE
 ";
 
 $resultadoCaixa =
@@ -90,6 +104,21 @@ $caixa =
 
 $caixaId =
     (int)$caixa["id"];
+
+if ($tipo !== "entrada") {
+    $stmtDisponivel = $conn->prepare("SELECT quantidade FROM caixa_denominacoes WHERE caixa_id = ? AND valor_centavos = ? FOR UPDATE");
+    foreach ($quantidadesDinheiro as $valorCentavos => $quantidade) {
+        if ($quantidade <= 0) continue;
+        $stmtDisponivel->bind_param("ii", $caixaId, $valorCentavos);
+        $stmtDisponivel->execute();
+        $linha = $stmtDisponivel->get_result()->fetch_assoc();
+        if (!$linha || (int)$linha["quantidade"] < $quantidade) {
+            $conn->rollback();
+            header("Location: caixa.php?erro=saldo_notas");
+            exit;
+        }
+    }
+}
 
 
 $sql = "
@@ -120,11 +149,36 @@ $stmt->bind_param(
 
 if ($stmt->execute()) {
 
+    $movimentacaoId = $conn->insert_id;
+    $stmtDetalhe = $conn->prepare("INSERT INTO movimentacao_dinheiro_detalhes (movimentacao_id, valor_centavos, quantidade) VALUES (?, ?, ?)");
+    $stmtSaldo = $conn->prepare("INSERT INTO caixa_denominacoes (caixa_id, valor_centavos, quantidade) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quantidade = quantidade + VALUES(quantidade)");
+
+    foreach ($quantidadesDinheiro as $valorCentavos => $quantidade) {
+        if ($quantidade <= 0) continue;
+        $stmtDetalhe->bind_param("iii", $movimentacaoId, $valorCentavos, $quantidade);
+        if (!$stmtDetalhe->execute()) {
+            $conn->rollback();
+            header("Location: caixa.php?erro=1");
+            exit;
+        }
+        $ajuste = $tipo === "entrada" ? $quantidade : -$quantidade;
+        $stmtSaldo->bind_param("iii", $caixaId, $valorCentavos, $ajuste);
+        if (!$stmtSaldo->execute()) {
+            $conn->rollback();
+            header("Location: caixa.php?erro=1");
+            exit;
+        }
+    }
+
+    $conn->commit();
+
     header(
         "Location: caixa.php?movimentacao=1"
     );
 
 }else{
+
+    $conn->rollback();
 
     header(
         "Location: caixa.php?erro=1"
